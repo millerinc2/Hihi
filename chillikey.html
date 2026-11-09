@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ChilliHubV2 - License Key System</title>
+
+    <!-- Chặn lưu bộ nhớ đệm trình duyệt -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <!-- Bảo mật Session: Xóa ngay lập tức ?pass= khỏi URL chống Chrome tự đề xuất -->
+    <script>
+        (function() {
+            try {
+                const url = new URL(window.location.href);
+                const pass = url.searchParams.get("pass");
+                const VALID_PASS = ["chilli", "chilliv2", "chillihubv2", "ronnei2026", "omg2026"];
+
+                if (pass && VALID_PASS.includes(pass)) {
+                    sessionStorage.setItem("ChilliV2_Auth_Session", "ACTIVE_" + Date.now());
+                    window.history.replaceState(null, document.title, window.location.pathname);
+                }
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&family=Space+Grotesk:wght@700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            background: radial-gradient(circle at 50% 20%, #2b080b 0%, #120304 55%, #080102 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 18px 12px;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Lưới tinh thể lửa nền */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-size: 38px 38px;
+            background-image: 
+                linear-gradient(to right, rgba(239, 68, 68, 0.04) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(239, 68, 68, 0.04) 1px, transparent 1px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            width: 420px;
+            height: 420px;
+            border-radius: 50%;
+            filter: blur(140px);
+            opacity: 0.28;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .glow-red { top: -80px; left: 50%; transform: translateX(-50%); background: #ef4444; }
+        .glow-orange { bottom: -80px; right: -50px; background: #f97316; }
+
+        /* Màn hình từ chối truy cập */
+        .denied-container {
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            padding: 44px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .denied-title {
+            font-family: 'Space Grotesk', sans-serif;
+            color: #ef4444;
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 14px;
+            letter-spacing: 1px;
+            text-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+        }
+
+        .denied-desc {
+            color: #a8a29e;
+            font-size: 13.5px;
+            line-height: 1.65;
+            margin-bottom: 18px;
+        }
+
+        .denied-action {
+            color: #fb923c;
+            font-size: 13.5px;
+            font-weight: 700;
+            line-height: 1.6;
+        }
+
+        /* Khung thẻ chính ChilliHubV2 */
+        .hub-card {
+            width: 100%;
+            max-width: 405px;
+            background: linear-gradient(175deg, rgba(28, 10, 12, 0.96) 0%, rgba(12, 4, 6, 0.98) 100%);
+            border-radius: 28px;
+            padding: 26px 20px 22px 20px;
+            position: relative;
+            z-index: 10;
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.95), 0 0 45px rgba(239, 68, 68, 0.2);
+            animation: cardEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            border: 1px solid rgba(239, 68, 68, 0.35);
+        }
+
+        @keyframes cardEntrance {
+            from { opacity: 0; transform: translateY(22px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Viền lửa chuyển sắc gradient */
+        .hub-card::before {
+            content: '';
+            position: absolute;
+            top: -1.5px; left: -1.5px; right: -1.5px; bottom: -1.5px;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.85), rgba(249, 115, 22, 0.2), rgba(220, 38, 38, 0.9), rgba(254, 243, 199, 0.2));
+            border-radius: 29.5px;
+            z-index: -1;
+            opacity: 0.75;
+            background-size: 300% 300%;
+            animation: borderShine 5s linear infinite;
+        }
+
+        @keyframes borderShine {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Logo Ớt Đỏ ChilliHub V2 */
+        .logo-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+        .logo-box {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(145deg, #300f13, #150507);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 34px;
+            border: 1.5px solid rgba(239, 68, 68, 0.6);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(239, 68, 68, 0.25);
+            animation: floatIcon 3.5s ease-in-out infinite;
+        }
+        @keyframes floatIcon {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .hub-header {
+            text-align: center;
+            margin-bottom: 18px;
+        }
+        .hub-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 26px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #ffffff 0%, #fee2e2 50%, #ef4444 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1.2px;
+        }
+        .hub-subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px;
+            color: #fb923c;
+            margin-top: 4px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+
+        .status-row {
+            background: rgba(30, 10, 14, 0.7);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 14px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .status-label {
+            font-size: 12px;
+            color: #f5f5f4;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-badge {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.45);
+            padding: 4px 11px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            letter-spacing: 0.5px;
+        }
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            background: #ef4444;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ef4444;
+        }
+
+        .grid-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .info-card {
+            background: rgba(30, 10, 14, 0.7);
+            border: 1px solid rgba(249, 115, 22, 0.25);
+            border-radius: 14px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+        .info-card .label { color: #a8a29e; font-weight: 600; }
+        .info-card .pill-cycle {
+            background: linear-gradient(135deg, #e11d48, #b91c1c);
+            color: #ffffff;
+            padding: 3px 8px;
+            border-radius: 7px;
+            font-size: 11px;
+            font-weight: 800;
+        }
+        .info-card .val-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            color: #fb923c;
+            font-size: 12px;
+        }
+
+        .key-section {
+            background: rgba(20, 6, 8, 0.85);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            border-radius: 18px;
+            padding: 15px;
+            margin-bottom: 14px;
+            box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.7);
+        }
+        .key-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .key-title {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #fca5a5;
+            letter-spacing: 0.6px;
+        }
+        .key-badge-status {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #a8a29e;
+            transition: all 0.3s;
+        }
+        .key-badge-status.active {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.45);
+        }
+
+        .key-display-box {
+            background: #0d0304;
+            border: 1.5px solid #280a0d;
+            border-radius: 12px;
+            padding: 13px;
+            text-align: center;
+            margin-bottom: 12px;
+            transition: all 0.35s ease;
+        }
+        .key-display-box.unlocked {
+            border-color: #ef4444;
+            background: #20070a;
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.35);
+        }
+        .key-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 800;
+            color: #78716c;
+            letter-spacing: 1px;
+            word-break: break-all;
+            transition: all 0.3s;
+        }
+        .key-text.unlocked {
+            color: #fee2e2;
+            text-shadow: 0 0 14px rgba(239, 68, 68, 0.85);
+        }
+
+        .btn-action {
+            width: 100%;
+            height: 46px;
+            border: none;
+            border-radius: 12px;
+            font-size: 12.5px;
+            font-weight: 900;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: linear-gradient(90deg, #ff5722 0%, #ef4444 50%, #dc2626 100%);
+            color: #ffffff;
+            box-shadow: 0 5px 20px rgba(239, 68, 68, 0.4);
+            letter-spacing: 0.5px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-action:active { transform: scale(0.98); }
+        .btn-action.copied {
+            background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+            color: #ffffff;
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.45);
+        }
+
+        .script-section {
+            background: rgba(20, 6, 8, 0.85);
+            border: 1px solid rgba(249, 115, 22, 0.25);
+            border-radius: 16px;
+            padding: 13px 15px;
+            margin-bottom: 12px;
+        }
+        .script-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .script-title {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #fed7aa;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-copy-script {
+            background: none;
+            border: none;
+            color: #fb923c;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .script-code-box {
+            background: #0d0304;
+            border: 1px solid #280a0d;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9.5px;
+            color: #ffedd5;
+            line-height: 1.45;
+            word-break: break-all;
+            user-select: all;
+        }
+
+        .sfx-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2px 4px 8px 4px;
+        }
+        .sfx-label {
+            font-size: 11px;
+            color: #a8a29e;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sfx-btn {
+            background: rgba(30, 10, 14, 0.8);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+            padding: 3px 12px;
+            border-radius: 16px;
+            font-size: 10.5px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 10.5px;
+            color: #78716c;
+            font-weight: 600;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: -90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1c0608;
+            border: 1.5px solid #ef4444;
+            color: #fee2e2;
+            padding: 11px 22px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.85);
+            transition: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 99;
+        }
+        .toast.show { bottom: 22px; }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-glow glow-red"></div>
+    <div class="ambient-glow glow-orange"></div>
+
+    <!-- MÀN HÌNH TỪ CHỐI TRUY CẬP (KHI KHÔNG CÓ PASS) -->
+    <div class="denied-container" id="accessDeniedScreen" style="display: none;">
+        <h1 class="denied-title">ACCESS DENIED</h1>
+        <p class="denied-desc">Liên kết đã hết hạn hoặc bạn đang mở từ Lịch sử / Bookmark trình duyệt.</p>
+        <p class="denied-action">Vui lòng mở lại Roblox Script và bấm "LẤY KEY" để vượt link cấp quyền!</p>
+    </div>
+
+    <!-- GIAO DIỆN CHÍNH CHILLIHUBV2 -->
+    <div class="hub-card" id="mainHubScreen" style="display: none;">
+        <div class="logo-wrapper">
+            <div class="logo-box">🌶️</div>
+        </div>
+
+        <div class="hub-header">
+            <div class="hub-title">CHILLI HUB V2</div>
+            <div class="hub-subtitle">freemium : chillihubv2 loader</div>
+        </div>
+
+        <div class="status-row">
+            <div class="status-label">🔑 Security Protocol:</div>
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                ONLINE · V2 ACTIVE
+            </div>
+        </div>
+
+        <div class="grid-info">
+            <div class="info-card">
+                <span class="label">Chu kỳ:</span>
+                <span class="pill-cycle">24H Rotation</span>
+            </div>
+            <div class="info-card">
+                <span class="label">Đổi Key sau:</span>
+                <span class="val-time" id="countdownTimer">--:--:--</span>
+            </div>
+        </div>
+
+        <div class="key-section">
+            <div class="key-header">
+                <span class="key-title">MÃ KEY PHIÊN HIỆN TẠI (24H):</span>
+                <span class="key-badge-status" id="keyBadge">Chưa nhận</span>
+            </div>
+
+            <div class="key-display-box" id="keyDisplayBox">
+                <div class="key-text" id="keyDisplay">•••••••••••••••••••••••••••••</div>
+            </div>
+
+            <button class="btn-action" id="btnAction" onclick="handleKeyAction()">
+                <span id="btnIcon">⚡</span>
+                <span id="btnText">NHẬN KEY CHILLI V2</span>
+            </button>
+        </div>
+
+        <div class="script-section">
+            <div class="script-header">
+                <span class="script-title">🚀 SCRIPT CHILLI HUB V2</span>
+                <button class="btn-copy-script" onclick="copyScriptLoader()">Sao chép Loader</button>
+            </div>
+            <div class="script-code-box">
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/robvxs24/freemium/refs/heads/main/chillihubv2.lua"))()
+            </div>
+        </div>
+
+        <div class="sfx-row">
+            <div class="sfx-label">🔔 Âm thanh SFX:</div>
+            <button class="sfx-btn" id="sfxBtn" onclick="toggleSFX()">
+                <span id="sfxStatus">Bật 🟢</span>
+            </button>
+        </div>
+
+        <div class="footer-note">
+            Key tự động đồng bộ và đổi mới sau mỗi 24 giờ (00:00 GMT+7)!
+        </div>
+    </div>
+
+    <!-- Toast Thông Báo -->
+    <div class="toast" id="toast">Đã sao chép mã Key ChilliHubV2 vào bộ nhớ tạm!</div>
+        <script>
+        // =========================================================================
+        //  1. KIỂM TRA PHIÊN HỢP LỆ (CHỐNG BYPASS VÀ CHỐNG GỢI Ý CHROME)
+        // =========================================================================
+        const isAuthed = sessionStorage.getItem("ChilliV2_Auth_Session");
+
+        if (isAuthed) {
+            document.getElementById('mainHubScreen').style.display = 'block';
+            document.getElementById('accessDeniedScreen').style.display = 'none';
+        } else {
+            document.getElementById('accessDeniedScreen').style.display = 'flex';
+            document.getElementById('mainHubScreen').style.display = 'none';
+        }
+
+        // =========================================================================
+        //  2. HIỆU ỨNG ÂM THANH SFX
+        // =========================================================================
+        let isAudioEnabled = true;
+        let isKeyUnlocked = false;
+        let generatedKey = "";
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type) {
+            if (!isAudioEnabled) return;
+            try {
+                initAudio();
+                const now = audioCtx.currentTime;
+
+                if (type === 'generate') {
+                    // Âm thanh kích hoạt hệ thống mã hóa
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(freq, now + (idx * 0.05));
+                        gain.gain.setValueAtTime(0.15, now + (idx * 0.05));
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + (idx * 0.05) + 0.3);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + (idx * 0.05));
+                        osc.stop(now + (idx * 0.05) + 0.3);
+                    });
+                } else if (type === 'copy') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, now);
+                    osc.frequency.exponentialRampToValueAtTime(1320, now + 0.1);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                }
+            } catch (e) {}
+        }
+
+        function toggleSFX() {
+            isAudioEnabled = !isAudioEnabled;
+            const status = document.getElementById('sfxStatus');
+            if (isAudioEnabled) {
+                status.innerText = "Bật 🟢";
+                playSound('copy');
+            } else {
+                status.innerText = "Tắt 🔴";
+            }
+        }
+
+        // =========================================================================
+        //  3. THUẬT TOÁN ĐỔI KEY: chillihubv2-XXXX-YYYY-ZZZZ (24H GMT+7)
+        // =========================================================================
+        function getVietnamTime() {
+            const now = new Date();
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            return new Date(utc + (7 * 3600000));
+        }
+
+        function calculateChilliV2Key() {
+            const vn = getVietnamTime();
+            const day = vn.getDate();
+            const month = vn.getMonth() + 1;
+            const year = vn.getFullYear();
+
+            // Thuật toán mã hóa băm riêng biệt cho ChilliHubV2 (24 giờ GMT+7)
+            const v1 = (day * 3617 + month * 2851 + year * 149) % 65535;
+            const v2 = (day * 6211 + month * 4397 + year * 269) % 65535;
+            const v3 = (day * 7919 + month * 6571 + year * 409) % 65535;
+
+            const h1 = v1.toString(16).toUpperCase().padStart(4, '0');
+            const h2 = v2.toString(16).toUpperCase().padStart(4, '0');
+            const h3 = v3.toString(16).toUpperCase().padStart(4, '0');
+
+            return `chillihubv2-${h1}-${h2}-${h3}`;
+        }
+
+        // Đếm lùi chuẩn xác đến 24:00 (00:00 đêm)
+        function updateCountdown() {
+            const vn = getVietnamTime();
+            const h = vn.getHours();
+            const m = vn.getMinutes();
+            const s = vn.getSeconds();
+
+            let remainingSec = (24 * 3600) - (h * 3600 + m * 60 + s);
+
+            const hoursLeft = Math.floor(remainingSec / 3600).toString().padStart(2, '0');
+            const minsLeft = Math.floor((remainingSec % 3600) / 60).toString().padStart(2, '0');
+            const secsLeft = (remainingSec % 60).toString().padStart(2, '0');
+
+            const timerEl = document.getElementById('countdownTimer');
+            if (timerEl) {
+                timerEl.innerText = `${hoursLeft}:${minsLeft}:${secsLeft}`;
+            }
+        }
+        setInterval(updateCountdown, 1000);
+        updateCountdown();
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2200);
+        }
+
+        function handleKeyAction() {
+            const btn = document.getElementById('btnAction');
+            const btnText = document.getElementById('btnText');
+            const btnIcon = document.getElementById('btnIcon');
+            const keyDisplay = document.getElementById('keyDisplay');
+            const keyBox = document.getElementById('keyDisplayBox');
+            const keyBadge = document.getElementById('keyBadge');
+
+            if (!isKeyUnlocked) {
+                btn.style.pointerEvents = 'none';
+                btnText.innerText = "AUTHENTICATING...";
+                btnIcon.innerText = "⏳";
+
+                setTimeout(() => {
+                    generatedKey = calculateChilliV2Key();
+                    isKeyUnlocked = true;
+
+                    keyDisplay.innerText = generatedKey;
+                    keyDisplay.classList.add('unlocked');
+                    keyBox.classList.add('unlocked');
+
+                    keyBadge.innerText = "Đã lấy ✓";
+                    keyBadge.classList.add('active');
+
+                    btnIcon.innerText = "📋";
+                    btnText.innerText = "SAO CHÉP MÃ KEY";
+                    btn.style.pointerEvents = 'auto';
+
+                    playSound('generate');
+                    showToast("Đã cấp mã ChilliHubV2 Key thành công!");
+                }, 380);
+            } else {
+                playSound('copy');
+                navigator.clipboard.writeText(generatedKey).catch(() => {
+                    const el = document.createElement("textarea");
+                    el.value = generatedKey;
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                });
+
+                btn.classList.add('copied');
+                btnIcon.innerText = "✔";
+                btnText.innerText = "ĐÃ SAO CHÉP MÃ KEY!";
+                showToast("Đã sao chép mã Key vào bộ nhớ tạm!");
+
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btnIcon.innerText = "📋";
+                    btnText.innerText = "SAO CHÉP MÃ KEY";
+                }, 2200);
+            }
+        }
+
+        function copyScriptLoader() {
+            playSound('copy');
+            const loaderCode = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/robvxs24/freemium/refs/heads/main/chillihubv2.lua';
+            navigator.clipboard.writeText(loaderCode).catch(() => {
+                const el = document.createElement("textarea");
+                el.value = loaderCode;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+            });
+            showToast("Đã sao chép Script Loader ChilliHubV2!");
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chilli Hub V5 — Key System</title>
+
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <!-- CƠ CHẾ ONE-TIME TOKEN: XÓA URL NGAY LẬP TỨC & CHỈ CHO PHÉP DÙNG 1 LẦN DUY NHẤT -->
+    <script>
+        window.__CHILLI_V5_AUTHORIZED = false;
+
+        (function() {
+            try {
+                const url = new URL(window.location.href);
+                const pass = url.searchParams.get("pass");
+                const VALID_PASS = ["chilli", "chilliv5", "chillihubv5", "ronnei", "ronnei2026"];
+
+                // 1. Nếu đi từ link rút gọn vào có ?pass= hợp lệ:
+                if (pass && VALID_PASS.includes(pass)) {
+                    // Xóa sạch ?pass= khỏi thanh địa chỉ ngay lập tức
+                    window.history.replaceState(null, document.title, window.location.pathname);
+
+                    // Kiểm tra xem trình duyệt có đang bấm Reload (F5) lại URL cũ không
+                    const navEntries = performance.getEntriesByType && performance.getEntriesByType("navigation");
+                    const isReload = (navEntries && navEntries.length > 0 && navEntries[0].type === "reload") ||
+                                     (window.performance && performance.navigation && performance.navigation.type === 1);
+
+                    if (!isReload) {
+                        window.__CHILLI_V5_AUTHORIZED = true;
+                    }
+                }
+
+                // 2. Xóa hoàn toàn mọi dữ liệu lưu trữ cũ để chống giữ phiên khi F5
+                sessionStorage.removeItem("ChilliV5_Session");
+                localStorage.removeItem("ChilliV5_Session");
+            } catch (e) {
+                window.__CHILLI_V5_AUTHORIZED = false;
+            }
+        })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #090a0f;
+            --bg-card: #11131a;
+            --bg-input: #0b0c10;
+            --border-subtle: #222634;
+            --accent-primary: #e11d48;
+            --accent-hover: #be123c;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --success: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            background-image: radial-gradient(circle at 50% 0%, rgba(225, 29, 72, 0.12) 0%, transparent 60%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 14px;
+            color: var(--text-main);
+        }
+
+        .restricted-box {
+            width: 100%;
+            max-width: 390px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 18px;
+            padding: 36px 24px;
+            text-align: center;
+            display: none;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
+            animation: slideUp 0.25s ease-out;
+        }
+
+        .restricted-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(225, 29, 72, 0.1);
+            border: 1px solid rgba(225, 29, 72, 0.3);
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 16px;
+        }
+
+        .restricted-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+
+        .restricted-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .restricted-note {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #fb7185;
+            background: rgba(225, 29, 72, 0.08);
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(225, 29, 72, 0.2);
+            line-height: 1.5;
+        }
+
+        .main-card {
+            width: 100%;
+            max-width: 400px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 24px 20px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
+            display: none;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 18px;
+            border-bottom: 1px solid var(--border-subtle);
+            margin-bottom: 18px;
+        }
+
+        .brand-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            background: #191c26;
+            border: 1px solid #2e3446;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .brand-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.2px;
+        }
+
+        .brand-sub {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: #34d399;
+            padding: 5px 10px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background: #10b981;
+            border-radius: 50%;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .stat-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 10px 12px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .stat-value.mono {
+            font-family: 'JetBrains Mono', monospace;
+            color: #fb7185;
+        }
+
+        .field-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .state-tag {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+        }
+
+        .state-tag.ready { color: var(--success); }
+
+        .key-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+
+        .key-box.active {
+            border-color: rgba(225, 29, 72, 0.5);
+            background: rgba(225, 29, 72, 0.04);
+        }
+
+        .key-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+            word-break: break-all;
+        }
+
+        .key-value.active {
+            color: var(--text-main);
+            user-select: all;
+        }
+
+        .primary-btn {
+            width: 100%;
+            height: 44px;
+            background: var(--accent-primary);
+            color: #ffffff;
+            border: none;
+            border-radius: 11px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.15s, transform 0.1s;
+            margin-bottom: 20px;
+        }
+
+        .primary-btn:hover { background: var(--accent-hover); }
+        .primary-btn:active { transform: scale(0.985); }
+        .primary-btn.copied { background: var(--success); }
+
+        .script-container {
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+
+        .script-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .script-label {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .copy-small-btn {
+            background: #191c26;
+            border: 1px solid #2e3446;
+            color: var(--text-main);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .copy-small-btn:active { transform: scale(0.96); }
+
+        .code-block {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: #cbd5e1;
+            line-height: 1.5;
+            word-break: break-all;
+            user-select: all;
+            padding-top: 4px;
+        }
+
+        .card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-subtle);
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .audio-toggle {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .toast-popup {
+            position: fixed;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #181b24;
+            border: 1px solid #2e3446;
+            color: var(--text-main);
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            transition: bottom 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 100;
+        }
+
+        .toast-popup.show { bottom: 24px; }
+    </style>
+</head>
+<body>
+
+    <!-- MÀN HÌNH CHẶN KHI RELOAD (F5) HOẶC VÀO LẠI TỪ LỊCH SỬ / BOOKMARK -->
+    <div class="restricted-box" id="deniedScreen">
+        <div class="restricted-icon">🔒</div>
+        <div class="restricted-title">Phiên truy cập đã đóng</div>
+        <p class="restricted-desc">
+            Mỗi lượt vượt link chỉ được phép truy cập <b>1 lần duy nhất</b>. Tải lại trang (Reload) hoặc mở từ lịch sử trình duyệt đều bị từ chối.
+        </p>
+        <div class="restricted-note">
+            Vui lòng mở lại menu Chilli Hub V5 trong Roblox và bấm "Lấy Key" để tạo phiên mới.
+        </div>
+    </div>
+
+    <!-- GIAO DIỆN CHÍNH CHILLI HUB V5 -->
+    <div class="main-card" id="mainScreen">
+        <div class="card-header">
+            <div class="brand-group">
+                <div class="brand-logo">🌶️</div>
+                <div>
+                    <div class="brand-title">Chilli Hub V5</div>
+                    <div class="brand-sub">by ronnei7.htk</div>
+                </div>
+            </div>
+            <div class="status-pill">
+                <span class="status-dot"></span>
+                Hoạt động
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">Thời hạn Key</div>
+                <div class="stat-value">24 Giờ</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Làm mới sau</div>
+                <div class="stat-value mono" id="countdownTimer">--:--:--</div>
+            </div>
+        </div>
+
+        <div class="field-label">
+            <span>Mã Key của bạn (Phiên 1 lần)</span>
+            <span class="state-tag" id="keyStateTag">Chưa tạo</span>
+        </div>
+
+        <div class="key-box" id="keyBox">
+            <div class="key-value" id="keyDisplay">••••••-••••-••••-••••</div>
+        </div>
+
+        <button class="primary-btn" id="actionBtn" onclick="handleKeyButton()">
+            <span id="btnText">Nhận Key Chilli V5</span>
+        </button>
+
+        <div class="script-container">
+            <div class="script-top">
+                <span class="script-label">Script Loader (V5)</span>
+                <button class="copy-small-btn" onclick="copyLoaderScript()">Sao chép</button>
+            </div>
+            <div class="code-block">loadstring(game:HttpGet("https://raw.githubusercontent.com/ronnei/hihi/refs/heads/main/chillihubv5.lua"))()</div>
+        </div>
+
+        <div class="card-footer">
+            <span>Không tải lại trang khi chưa chép Key!</span>
+            <button class="audio-toggle" id="sfxToggle" onclick="toggleAudio()">Âm thanh: Bật</button>
+        </div>
+    </div>
+
+    <div class="toast-popup" id="toastPopup">Đã sao chép vào bộ nhớ tạm</div>
+        <script>
+        // =========================================================================
+        //  1. KIỂM SOÁT CHỐNG TRUY CẬP LẠI (ANTI-RELOAD / ANTI-BFCACHE / TIMEOUT)
+        // =========================================================================
+        const mainScreen = document.getElementById('mainScreen');
+        const deniedScreen = document.getElementById('deniedScreen');
+
+        function lockAccessImmediately() {
+            window.__CHILLI_V5_AUTHORIZED = false;
+            mainScreen.style.display = 'none';
+            deniedScreen.style.display = 'block';
+            // Xóa trắng mã key trên DOM để không thể inspect lại
+            const kd = document.getElementById('keyDisplay');
+            if (kd) kd.innerText = "SESSION EXPIRED";
+        }
+
+        // Chỉ mở khi biến RAM thực sự hợp lệ ở lần load đầu tiên
+        if (window.__CHILLI_V5_AUTHORIZED === true) {
+            mainScreen.style.display = 'block';
+            deniedScreen.style.display = 'none';
+            // Đốt cờ ngay sau khi render để không thể gọi lại
+            window.__CHILLI_V5_AUTHORIZED = false;
+        } else {
+            lockAccessImmediately();
+        }
+
+        // Chặn tuyệt đối việc bấm nút Back/Forward trên trình duyệt di động (BFCache)
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                lockAccessImmediately();
+            }
+        });
+
+        // Chặn việc người dùng giữ tab treo ngầm quá 3 phút rồi mở lại
+        let hiddenTimestamp = 0;
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                hiddenTimestamp = Date.now();
+            } else {
+                if (hiddenTimestamp > 0 && (Date.now() - hiddenTimestamp > 180000)) {
+                    lockAccessImmediately();
+                }
+            }
+        });
+
+        // =========================================================================
+        //  2. ÂM THANH PHẢN HỒI
+        // =========================================================================
+        let soundEnabled = true;
+        let keyUnlocked = false;
+        let currentKey = "";
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function playTone(freq, duration) {
+            if (!soundEnabled) return;
+            try {
+                if (!audioCtx) audioCtx = new AudioCtx();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+
+        function toggleAudio() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('sfxToggle');
+            btn.innerText = soundEnabled ? "Âm thanh: Bật" : "Âm thanh: Tắt";
+            if (soundEnabled) playTone(800, 0.08);
+        }
+
+        // =========================================================================
+        //  3. THUẬT TOÁN KEY 24H: chillihubv5-XXXX-YYYY-ZZZZ (GMT+7)
+        // =========================================================================
+        function getVNTime() {
+            const now = new Date();
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            return new Date(utc + (7 * 3600000));
+        }
+
+        function generateChilliV5Key() {
+            const vn = getVNTime();
+            const day = vn.getDate();
+            const month = vn.getMonth() + 1;
+            const year = vn.getFullYear();
+
+            const v1 = (day * 4339 + month * 3187 + year * 173) % 65535;
+            const v2 = (day * 6823 + month * 4931 + year * 293) % 65535;
+            const v3 = (day * 8513 + month * 7109 + year * 431) % 65535;
+
+            const h1 = v1.toString(16).toUpperCase().padStart(4, '0');
+            const h2 = v2.toString(16).toUpperCase().padStart(4, '0');
+            const h3 = v3.toString(16).toUpperCase().padStart(4, '0');
+
+            return `chillihubv5-${h1}-${h2}-${h3}`;
+        }
+
+        function updateTimer() {
+            const vn = getVNTime();
+            const elapsed = (vn.getHours() * 3600) + (vn.getMinutes() * 60) + vn.getSeconds();
+            const left = 86400 - elapsed;
+
+            const h = Math.floor(left / 3600).toString().padStart(2, '0');
+            const m = Math.floor((left % 3600) / 60).toString().padStart(2, '0');
+            const s = (left % 60).toString().padStart(2, '0');
+
+            const el = document.getElementById('countdownTimer');
+            if (el) el.innerText = `${h}:${m}:${s}`;
+        }
+        setInterval(updateTimer, 1000);
+        updateTimer();
+
+        function notifyToast(text) {
+            const toast = document.getElementById('toastPopup');
+            toast.innerText = text;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function copyTextToClipboard(str) {
+            navigator.clipboard.writeText(str).catch(() => {
+                const ta = document.createElement("textarea");
+                ta.value = str;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            });
+        }
+
+        function handleKeyButton() {
+            const btn = document.getElementById('actionBtn');
+            const btnText = document.getElementById('btnText');
+            const keyDisplay = document.getElementById('keyDisplay');
+            const keyBox = document.getElementById('keyBox');
+            const stateTag = document.getElementById('keyStateTag');
+
+            if (!keyUnlocked) {
+                btn.style.pointerEvents = 'none';
+                btnText.innerText = "Đang khởi tạo mã...";
+
+                setTimeout(() => {
+                    currentKey = generateChilliV5Key();
+                    keyUnlocked = true;
+
+                    keyDisplay.innerText = currentKey;
+                    keyDisplay.classList.add('active');
+                    keyBox.classList.add('active');
+
+                    stateTag.innerText = "Sẵn sàng";
+                    stateTag.classList.add('ready');
+
+                    btnText.innerText = "Sao chép mã Key";
+                    btn.style.pointerEvents = 'auto';
+
+                    playTone(960, 0.12);
+                    notifyToast("Đã tạo mã Key Chilli Hub V5!");
+                }, 280);
+            } else {
+                playTone(1100, 0.09);
+                copyTextToClipboard(currentKey);
+
+                btn.classList.add('copied');
+                btnText.innerText = "Đã sao chép mã Key!";
+                notifyToast("Đã sao chép Key vào bộ nhớ tạm!");
+
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btnText.innerText = "Sao chép mã Key";
+                }, 2000);
+            }
+        }
+
+        function copyLoaderScript() {
+            playTone(1000, 0.08);
+            const code = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/ronnei/hihi/refs/heads/main/chillihubv5.lua"))()';
+            copyTextToClipboard(code);
+            notifyToast("Đã sao chép Script Loader V5!");
+        }
+    </script>
+</body>
+</html>

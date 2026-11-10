@@ -284,7 +284,7 @@ local function ShowLiveToast(titleText: string, initialSeconds: number, color: C
     Icon.Size = UDim2.new(0, 36, 1, 0)
     Icon.Position = UDim2.new(0, 8, 0, 0)
     Icon.BackgroundTransparency = 1
-    Icon.Text = "🌶️"
+    Icon.Text = "💗"
     Icon.TextSize = 18
     Icon.ZIndex = 51
     Icon.Parent = ToastFrame
@@ -305,7 +305,7 @@ local function ShowLiveToast(titleText: string, initialSeconds: number, color: C
     Msg.Size = UDim2.new(1, -55, 0, 16)
     Msg.Position = UDim2.new(0, 44, 0, 28)
     Msg.BackgroundTransparency = 1
-    Msg.Text = "🔓 Key Permanente • OpenWonx"
+    Msg.Text = "🔓 Key Permanente • OpenWonx • Athalia"
     Msg.TextColor3 = Color3.fromRGB(148, 163, 184)
     Msg.TextSize = 10.5
     Msg.Font = Enum.Font.GothamMedium
@@ -353,8 +353,8 @@ local Languages = {
     VI = {
         LangBtnText = "🇻🇳 VI",
         SelectLangTitle = "Chọn ngôn ngữ hiển thị",
-        Title = "Chilli Hub V5 - steal an egg 🥚 • OpenWonx",
-        Subtitle = "chilli hub v5 được tạo bởi OpenWonx",
+        Title = "Chilli Hub V5 - steal an egg 🥚 • OpenWonx • athalia",
+        Subtitle = "chilli hub v5 được tạo bởi OpenWonx athalia",
         CenterTitle = "CHILLI HUB V5 × OPENWONX",
         CenterSub = "Steal An Egg 🥚 Edition",
         Placeholder = "Dán mã key tại đây...",
@@ -375,9 +375,9 @@ local Languages = {
     EN = {
         LangBtnText = "🇺🇸 EN",
         SelectLangTitle = "Select Display Language",
-        Title = "Chilli Hub V5 - steal an egg 🥚 • OpenWonx",
-        Subtitle = "chilli hub v5 created by OpenWonx",
-        CenterTitle = "CHILLI HUB V5 × OPENWONX",
+        Title = "Chilli Hub V5 - steal an egg 🥚 • OpenWonx • athalia",
+        Subtitle = "chilli hub v5 created by OpenWonx Athalia",
+        CenterTitle = "CHILLI HUB V5 × OPENWONX x ATHALIA",
         CenterSub = "Steal An Egg 🥚 Edition",
         Placeholder = "Paste your license key here...",
         QuickPaste = "Paste",
@@ -690,7 +690,7 @@ OpenKeySystemUI = function()
     StatusMsg.Size = UDim2.new(1, -36, 0, 20)
     StatusMsg.Position = UDim2.new(0, 18, 0, 402)
     StatusMsg.BackgroundTransparency = 1
-    StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx"
+    StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx X ATHALIA"
     StatusMsg.TextColor3 = Color3.fromRGB(100, 116, 139)
     StatusMsg.TextSize = 9.5
     StatusMsg.Font = Enum.Font.GothamMedium
@@ -992,7 +992,7 @@ OpenKeySystemUI = function()
             if TutorialBtn and TutorialBtn.Parent then
                 TutorialBtn.Text = Languages[CurrentLang].Tutorial
                 TutorialBtn.TextColor3 = Color3.fromRGB(148, 163, 184)
-                StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx"
+                StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx X ATHALIA"
                 StatusMsg.TextColor3 = Color3.fromRGB(100, 116, 139)
             end
             isTutorialDebounce = false
@@ -1012,7 +1012,7 @@ OpenKeySystemUI = function()
             if GetKeyBtn and GetKeyBtn.Parent then
                 GetKeyBtn.Text = Languages[CurrentLang].GetKey
                 GetKeyBtn.BackgroundColor3 = Color3.fromRGB(225, 29, 72)
-                StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx"
+                StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx X ATHALIA"
                 StatusMsg.TextColor3 = Color3.fromRGB(100, 116, 139)
             end
         end)
@@ -1101,7 +1101,7 @@ end
 -- PATCH: GetKeyRemainingTime siempre retorna positivo → arranca directo
 local keyTimeLeft = GetKeyRemainingTime()
 if keyTimeLeft and keyTimeLeft > 0 then
-    ShowLiveToast("CHILLI HUB V5 • OPENWONX 🔓", keyTimeLeft, Color3.fromRGB(225, 29, 72))
+    ShowLiveToast("CHILLI HUB V5 • OPENWONX 🔓 X ATHALIA", keyTimeLeft, Color3.fromRGB(225, 29, 72))
     Save24hKey()
     LaunchTargetScriptWithWatcher()
     return

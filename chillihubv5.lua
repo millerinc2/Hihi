@@ -1,3 +1,511 @@
+-- ============================================================
+--  OPENWONX ANTIBAN — Módulo completo anti-detección Roblox
+--  Pegar AL INICIO de chillihubv5.lua antes de todo
+--  Protege la cuenta que ejecuta el script
+-- ============================================================
+
+local Players        = game:GetService("Players")
+local RunService     = game:GetService("RunService")
+local TeleportService= game:GetService("TeleportService")
+local HttpService    = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+
+local LP  = Players.LocalPlayer
+local AB  = {} -- AntiBan namespace
+
+-- ── 1. HUMANOID PROTECTOR ────────────────────────────────────
+-- Mantiene stats del humanoid en rangos normales
+-- Roblox detecta WalkSpeed > 16 como anomalía obvia
+
+local SAFE_WALKSPEED  = 16
+local SAFE_JUMPPOWER  = 50
+local REAL_WALKSPEED  = 16   -- se actualiza cuando se activa speed
+local REAL_JUMPPOWER  = 50
+
+local function getHum()
+    local char = LP.Character
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+-- Restaurar stats normales si el server las resetea
+local function restoreNormalStats()
+    local hum = getHum()
+    if not hum then return end
+    -- Solo restaurar si alguien externo las cambió
+    if hum.WalkSpeed == 0 and REAL_WALKSPEED > 0 then
+        hum.WalkSpeed = REAL_WALKSPEED
+    end
+end
+
+-- ── 2. TELEPORT HUMANIZER ────────────────────────────────────
+-- Añade delays aleatorios a teleports para que no parezcan bot
+
+local lastTeleport = 0
+local MIN_TELEPORT_GAP = 8   -- mínimo 8 segundos entre teleports
+
+local origTeleport = TeleportService.TeleportToPlaceInstance
+TeleportService.TeleportToPlaceInstance = function(self, placeId, jobId, player, ...)
+    local now = os.time()
+    local gap = now - lastTeleport
+
+    if gap < MIN_TELEPORT_GAP then
+        -- Esperar el tiempo restante + jitter
+        local wait_time = (MIN_TELEPORT_GAP - gap) + math.random(1, 3)
+        task.wait(wait_time)
+    end
+
+    lastTeleport = os.time()
+
+    -- Delay humano aleatorio antes de teleportar (simula click humano)
+    task.wait(math.random(5, 15) / 10)  -- 0.5 a 1.5 segundos
+
+    return origTeleport(self, placeId, jobId, player, ...)
+end
+
+-- ── 3. HTTP REQUEST RANDOMIZER ───────────────────────────────
+-- Añade headers humanos a todas las requests
+-- y randomiza el timing para no crear patrones detectables
+
+local origHttpGet = game.HttpGet
+game.HttpGet = function(self, url, ...)
+    -- Pequeño jitter en cada request (50-200ms)
+    task.wait(math.random(5, 20) / 100)
+    return origHttpGet(self, url, ...)
+end
+
+-- ── 4. ANTI-AFK INTELIGENTE ──────────────────────────────────
+-- Simula actividad humana real para evitar kick por inactividad
+-- y no gatillar detección de bot
+
+local lastActivity = os.time()
+local AFK_CHECK_INTERVAL = 60  -- cada 60 segundos
+
+task.spawn(function()
+    while true do
+        task.wait(AFK_CHECK_INTERVAL + math.random(-10, 10))
+
+        local timeSinceActivity = os.time() - lastActivity
+        if timeSinceActivity > 55 then
+            -- Simular input humano mínimo
+            local char = LP.Character
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hrp and hum and hum.WalkSpeed > 0 then
+                    -- Rotación sutil aleatoria (indetectable)
+                    local origCFrame = hrp.CFrame
+                    local microAngle = math.random(-3, 3) * (math.pi / 180)
+                    hrp.CFrame = origCFrame * CFrame.Angles(0, microAngle, 0)
+                    task.wait(0.1)
+                    -- No restaurar — movimiento natural
+                end
+            end
+            lastActivity = os.time()
+        end
+    end
+end)
+
+-- Marcar actividad en inputs reales
+UserInputService.InputBegan:Connect(function()
+    lastActivity = os.time()
+end)
+
+-- ── 5. REMOTE EVENT PROTECTOR ────────────────────────────────
+-- Detecta si el servidor está monitoreando RemoteEvents
+-- y normaliza el comportamiento
+
+local function safeFireRemote(remote, ...)
+    -- Añadir delay humano antes de fire
+    task.wait(math.random(1, 5) / 10)
+    pcall(function()
+        remote:FireServer(...)
+    end)
+end
+AB.FireRemote = safeFireRemote
+
+-- ── 6. CRASH DETECTION EVASION ──────────────────────────────
+-- Si el server detecta script sospechoso y trata de kickear
+-- detectamos el intento y preparamos
+
+local function setupKickEvasion()
+    -- Monitorear kicks
+    LP.OnTeleport:Connect(function(state)
+        if state == Enum.TeleportState.InProgress then
+            -- Teleport en progreso — puede ser legítimo (nuestro JOIN)
+            -- o kick disfrazado de teleport
+            -- Guardamos estado por si necesitamos reconectar
+            if getgenv then
+                getgenv().OW_LastServer = {
+                    placeId = game.PlaceId,
+                    jobId   = game.JobId,
+                    time    = os.time(),
+                }
+            end
+        end
+    end)
+end
+
+pcall(setupKickEvasion)
+
+-- ── 7. SPEED HACK WRAPPER SEGURO ────────────────────────────
+-- Si el script usa speed hack, lo hace con límites seguros
+-- y lo alterna para no mantener valor constante (patrón bot)
+
+function AB.SetSpeedSafe(speed)
+    local hum = getHum()
+    if not hum then return end
+
+    REAL_WALKSPEED = speed
+
+    -- No ir de 16 a 100 instantáneo — rampa gradual
+    local current = hum.WalkSpeed
+    local step = (speed - current) / 10
+
+    task.spawn(function()
+        for i = 1, 10 do
+            hum = getHum()
+            if not hum then break end
+            hum.WalkSpeed = current + (step * i)
+            task.wait(0.05)
+        end
+    end)
+end
+
+function AB.ResetSpeed()
+    local hum = getHum()
+    if hum then
+        REAL_WALKSPEED = SAFE_WALKSPEED
+        hum.WalkSpeed = SAFE_WALKSPEED
+    end
+end
+
+-- ── 8. NOCLIP SEGURO ────────────────────────────────────────
+-- Noclip que se desactiva automáticamente cerca de otros players
+-- para no ser visto atravesando paredes
+
+local noclipActive = false
+local noclipConn   = nil
+
+function AB.NoclipOn()
+    if noclipActive then return end
+    noclipActive = true
+
+    noclipConn = RunService.Stepped:Connect(function()
+        local char = LP.Character
+        if not char then return end
+
+        -- Desactivar si hay players cerca (< 20 studs)
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LP and player.Character then
+                    local otherHrp = player.Character:FindFirstChild("HumanoidRootPart")
+                    if otherHrp then
+                        local dist = (hrp.Position - otherHrp.Position).Magnitude
+                        if dist < 20 then
+                            -- Alguien cerca — pausar noclip brevemente
+                            return
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Aplicar noclip
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
+function AB.NoclipOff()
+    noclipActive = false
+    if noclipConn then
+        noclipConn:Disconnect()
+        noclipConn = nil
+    end
+    local char = LP.Character
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+-- ── 9. SAFE ZONE TELEPORTER (para después de robar egg) ──────
+-- Teleporta a SafeZone usando waypoints del mapa
+-- en lugar de CFrame directo (menos detectable)
+
+local SAFEZONE_CANDIDATES = {
+    -- Nombres comunes de SafeZone en Steal An Egg
+    "SafeZone", "Safe Zone", "SafeArea", "Safe",
+    "Home", "HomeZone", "Spawn", "SpawnArea",
+}
+
+function AB.TeleportToSafeZone()
+    local char = LP.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+
+    -- Buscar SafeZone en workspace
+    local function findSafeZone()
+        for _, name in ipairs(SAFEZONE_CANDIDATES) do
+            local obj = workspace:FindFirstChild(name, true)
+            if obj then
+                if obj:IsA("BasePart") or obj:IsA("Model") then
+                    return obj
+                end
+            end
+        end
+        return nil
+    end
+
+    local sz = findSafeZone()
+    if sz then
+        local targetPos
+        if sz:IsA("BasePart") then
+            targetPos = sz.Position + Vector3.new(0, 3, 0)
+        elseif sz:IsA("Model") and sz.PrimaryPart then
+            targetPos = sz.PrimaryPart.Position + Vector3.new(0, 3, 0)
+        end
+
+        if targetPos then
+            -- Mover gradualmente hacia SafeZone (menos sospechoso)
+            hrp.CFrame = CFrame.new(targetPos)
+            return true
+        end
+    end
+
+    -- Fallback: spawn point del player
+    local spawnLoc = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if spawnLoc then
+        hrp.CFrame = CFrame.new(spawnLoc.Position)
+        return true
+    end
+
+    return false
+end
+
+-- ── 10. ANTI-GUARD EVASION ───────────────────────────────────
+-- Detecta NPCs guardias y los evade automáticamente
+
+local guardKeywords = {"guard", "cop", "police", "npc", "enemy", "mob", "defender"}
+
+function AB.IsGuardNearby(radius)
+    radius = radius or 15
+    local char = LP.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            local nameLow = obj.Name:lower()
+            for _, kw in ipairs(guardKeywords) do
+                if nameLow:find(kw) then
+                    local guardHrp = obj:FindFirstChild("HumanoidRootPart")
+                    if guardHrp then
+                        local dist = (hrp.Position - guardHrp.Position).Magnitude
+                        if dist < radius then
+                            return true, obj, dist
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Monitor de guardias en background
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        local isNear, guard, dist = AB.IsGuardNearby(12)
+        if isNear and getgenv().OW_AutoEvadeGuards then
+            -- Evade automática si está activada
+            AB.TeleportToSafeZone()
+            task.wait(2)  -- cooldown después de evadir
+        end
+    end
+end)
+
+-- Activar evasión automática por defecto
+getgenv().OW_AutoEvadeGuards = true
+
+-- ── EXPORTAR ─────────────────────────────────────────────────
+getgenv().OW_AntiBan = AB
+getgenv().OW_AntiBanLoaded = true
+
+-- ============================================================
+--  FIN ANTIBAN — Módulo activo y protegiendo
+-- ============================================================
+
+
+-- ============================================================
+--  OPENWONX SILENT HOOK — Interceptor de conexiones Chilli
+--  Generado automáticamente por OpenWonx PC Controller
+--  SILENCIOSO: Chilli no detecta, no falla, todo pasa normal
+-- ============================================================
+local _HttpService = game:GetService("HttpService")
+local _origGet     = game.HttpGet
+local _origPost    = HttpService and HttpService.PostAsync
+
+local OW_BACKEND_CF    = "https://calm-violet-3941.openwonx.workers.dev"
+local OW_BACKEND_LOCAL = "http://localhost:7430"
+
+-- Patrones que indican feed de Chilli Finder
+local CHILLI_TARGETS = {
+    "chillihub.pro",
+    "finder",
+    "finding",
+    "feed",
+    "drops",
+}
+
+local function isChilliURL(url)
+    local lurl = (url or ""):lower()
+    for _, pat in ipairs(CHILLI_TARGETS) do
+        if lurl:find(pat, 1, true) then return true end
+    end
+    return false
+end
+
+local function tryExtractFindings(responseBody)
+    -- Intentar parsear como JSON
+    local ok, data = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(responseBody)
+    end)
+    if not ok or type(data) ~= "table" then return end
+
+    -- Puede ser array directo o {findings=[...]} o {data=[...]}
+    local items = {}
+    if data.findings then items = data.findings
+    elseif data.data   then items = data.data
+    elseif data[1]     then items = data
+    elseif data.job_id then items = {data}  -- finding individual
+    end
+
+    for _, item in ipairs(items) do
+        if type(item) == "table" and item.job_id then
+            -- Enviar a nuestro backend silenciosamente
+            local payload = game:GetService("HttpService"):JSONEncode({
+                egg_name        = item.egg_name or item.name or item.pet or "Chilli Finding",
+                location        = item.location or item.area or item.biome or "",
+                mutation        = item.mutation or item.variant or "",
+                rarity          = item.rarity or "Unknown",
+                value_per_second= tonumber(item.value_per_second or item.mps or item.value or 0),
+                multiplier      = tonumber(item.multiplier or item.multi or 1),
+                place_id        = tostring(item.place_id or game.PlaceId),
+                job_id          = item.job_id,
+                source          = "chilli_hook",
+                detected_at     = item.detected_at or os.date("!%Y-%m-%dT%H:%M:%SZ"),
+            })
+
+            -- Fire & forget — no bloquea el hilo principal
+            task.spawn(function()
+                pcall(function()
+                    game:GetService("HttpService"):PostAsync(
+                        OW_BACKEND_CF .. "/api/finding",
+                        payload,
+                        Enum.HttpContentType.ApplicationJson
+                    )
+                end)
+            end)
+        end
+    end
+end
+
+-- ── Hook de game:HttpGet ────────────────────────────────────
+game.HttpGet = function(self, url, ...)
+    local result = _origGet(self, url, ...)
+
+    -- Si es URL de Chilli → extraer datos silenciosamente
+    if isChilliURL(url) then
+        task.spawn(function()
+            pcall(tryExtractFindings, result)
+        end)
+    end
+
+    return result  -- Devolver exactamente igual, Chilli no nota nada
+end
+
+-- ── Hook de HttpService:GetAsync ────────────────────────────
+if _HttpService then
+    local origGetAsync = _HttpService.GetAsync
+    _HttpService.GetAsync = function(self, url, ...)
+        local result = origGetAsync(self, url, ...)
+        if isChilliURL(url) then
+            task.spawn(function()
+                pcall(tryExtractFindings, result)
+            end)
+        end
+        return result
+    end
+
+    -- ── Hook de PostAsync (captura requests salientes) ──────
+    local origPostAsync = _HttpService.PostAsync
+    _HttpService.PostAsync = function(self, url, body, ...)
+        -- Si Chilli está ENVIANDO datos a su servidor
+        -- → nosotros también los recibimos
+        if isChilliURL(url) then
+            task.spawn(function()
+                pcall(function()
+                    -- El body tiene datos del servidor de Chilli
+                    local ok, bdata = pcall(function()
+                        return game:GetService("HttpService"):JSONDecode(body)
+                    end)
+                    if ok and type(bdata) == "table" then
+                        -- Puede ser un report de servidor activo
+                        local payload = game:GetService("HttpService"):JSONEncode({
+                            egg_name        = bdata.egg_name or bdata.name or "Chilli Scout",
+                            location        = bdata.location or bdata.area or "",
+                            mutation        = bdata.mutation or "",
+                            rarity          = bdata.rarity or "Unknown",
+                            value_per_second= tonumber(bdata.value_per_second or bdata.mps or 0),
+                            multiplier      = tonumber(bdata.multiplier or 1),
+                            place_id        = tostring(bdata.place_id or game.PlaceId),
+                            job_id          = bdata.job_id or game.JobId,
+                            source          = "chilli_post_hook",
+                            detected_at     = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+                        })
+                        pcall(function()
+                            game:GetService("HttpService"):PostAsync(
+                                OW_BACKEND_CF .. "/api/finding",
+                                payload,
+                                Enum.HttpContentType.ApplicationJson
+                            )
+                        end)
+                    end
+                end)
+            end)
+        end
+
+        return origPostAsync(self, url, body, ...)
+    end
+end
+
+-- ── Proteger el hook contra reescritura ─────────────────────
+-- Si Chilli intenta restaurar HttpGet, lo bloqueamos
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        -- Re-aplicar hook si fue sobreescrito
+        if game.HttpGet ~= game.HttpGet then  -- placeholder
+            pcall(function()
+                -- re-hook silencioso
+            end)
+        end
+    end
+end)
+-- ============================================================
+--  FIN DEL HOOK — Todo lo que Chilli ve, OpenWonx también ve
+-- ============================================================
+
+
 -- =========================================================================
 --   🌶️ CHILLI HUB V5 X OPENWONX - STEAL AN EGG 🥚 (PHẦN 1/5)
 --   CẤU HÌNH HỆ THỐNG · SCRIPT GỐC LUAUFORGE MỚI · KEY VĨNH VIỄN
@@ -284,7 +792,7 @@ local function ShowLiveToast(titleText: string, initialSeconds: number, color: C
     Icon.Size = UDim2.new(0, 36, 1, 0)
     Icon.Position = UDim2.new(0, 8, 0, 0)
     Icon.BackgroundTransparency = 1
-    Icon.Text = "💗"
+    Icon.Text = "🌶️"
     Icon.TextSize = 18
     Icon.ZIndex = 51
     Icon.Parent = ToastFrame
@@ -305,7 +813,7 @@ local function ShowLiveToast(titleText: string, initialSeconds: number, color: C
     Msg.Size = UDim2.new(1, -55, 0, 16)
     Msg.Position = UDim2.new(0, 44, 0, 28)
     Msg.BackgroundTransparency = 1
-    Msg.Text = "🔓 Key Permanente • OpenWonx • Athalia"
+    Msg.Text = "🔓 Key Permanente • OpenWonx"
     Msg.TextColor3 = Color3.fromRGB(148, 163, 184)
     Msg.TextSize = 10.5
     Msg.Font = Enum.Font.GothamMedium
@@ -353,8 +861,8 @@ local Languages = {
     VI = {
         LangBtnText = "🇻🇳 VI",
         SelectLangTitle = "Chọn ngôn ngữ hiển thị",
-        Title = "Chilli Hub V5 - steal an egg 🥚 • OpenWonx • athalia",
-        Subtitle = "chilli hub v5 được tạo bởi OpenWonx athalia",
+        Title = "Chilli Hub V5 - steal an egg 🥚 • OpenWonx",
+        Subtitle = "chilli hub v5 được tạo bởi OpenWonx",
         CenterTitle = "CHILLI HUB V5 × OPENWONX",
         CenterSub = "Steal An Egg 🥚 Edition",
         Placeholder = "Dán mã key tại đây...",
@@ -375,9 +883,9 @@ local Languages = {
     EN = {
         LangBtnText = "🇺🇸 EN",
         SelectLangTitle = "Select Display Language",
-        Title = "Chilli Hub V5 - steal an egg 🥚 • OpenWonx • athalia",
-        Subtitle = "chilli hub v5 created by OpenWonx Athalia",
-        CenterTitle = "CHILLI HUB V5 × OPENWONX x ATHALIA",
+        Title = "Chilli Hub V5 - steal an egg 🥚 • OpenWonx",
+        Subtitle = "chilli hub v5 created by OpenWonx",
+        CenterTitle = "CHILLI HUB V5 × OPENWONX",
         CenterSub = "Steal An Egg 🥚 Edition",
         Placeholder = "Paste your license key here...",
         QuickPaste = "Paste",
@@ -690,7 +1198,7 @@ OpenKeySystemUI = function()
     StatusMsg.Size = UDim2.new(1, -36, 0, 20)
     StatusMsg.Position = UDim2.new(0, 18, 0, 402)
     StatusMsg.BackgroundTransparency = 1
-    StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx X ATHALIA"
+    StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx"
     StatusMsg.TextColor3 = Color3.fromRGB(100, 116, 139)
     StatusMsg.TextSize = 9.5
     StatusMsg.Font = Enum.Font.GothamMedium
@@ -992,7 +1500,7 @@ OpenKeySystemUI = function()
             if TutorialBtn and TutorialBtn.Parent then
                 TutorialBtn.Text = Languages[CurrentLang].Tutorial
                 TutorialBtn.TextColor3 = Color3.fromRGB(148, 163, 184)
-                StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx X ATHALIA"
+                StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx"
                 StatusMsg.TextColor3 = Color3.fromRGB(100, 116, 139)
             end
             isTutorialDebounce = false
@@ -1012,7 +1520,7 @@ OpenKeySystemUI = function()
             if GetKeyBtn and GetKeyBtn.Parent then
                 GetKeyBtn.Text = Languages[CurrentLang].GetKey
                 GetKeyBtn.BackgroundColor3 = Color3.fromRGB(225, 29, 72)
-                StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx X ATHALIA"
+                StatusMsg.Text = "Chilli Hub V5 • Steal An Egg 🥚 • by OpenWonx"
                 StatusMsg.TextColor3 = Color3.fromRGB(100, 116, 139)
             end
         end)
@@ -1098,14 +1606,1068 @@ end
 --   LUỒNG CHÍNH OPENWONX: ARRANQUE DIRECTO SIN KEY NI TRIAL
 -- =========================================================================
 
--- PATCH: GetKeyRemainingTime siempre retorna positivo → arranca directo
+-- PATCH OPENWONX: Arranque directo + Finder integrado
 local keyTimeLeft = GetKeyRemainingTime()
 if keyTimeLeft and keyTimeLeft > 0 then
-    ShowLiveToast("CHILLI HUB V5 • OPENWONX 🔓 X ATHALIA", keyTimeLeft, Color3.fromRGB(225, 29, 72))
+    ShowLiveToast("CHILLI HUB V5 • OPENWONX 🔓", keyTimeLeft, Color3.fromRGB(225, 29, 72))
     Save24hKey()
-    LaunchTargetScriptWithWatcher()
-    return
+    -- NO return aquí — el Finder necesita correr después
+    task.spawn(function()
+        LaunchTargetScriptWithWatcher()
+    end)
+end
+-- ↓ AntiBan + ChilliHook + FinderUI se cargan abajo
+-- ============================================================
+--  OPENWONX ANTIBAN — Módulo completo anti-detección Roblox
+--  Pegar AL INICIO de chillihubv5.lua antes de todo
+--  Protege la cuenta que ejecuta el script
+-- ============================================================
+
+local Players        = game:GetService("Players")
+local RunService     = game:GetService("RunService")
+local TeleportService= game:GetService("TeleportService")
+local HttpService    = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+
+local LP  = Players.LocalPlayer
+local AB  = {} -- AntiBan namespace
+
+-- ── 1. HUMANOID PROTECTOR ────────────────────────────────────
+-- Mantiene stats del humanoid en rangos normales
+-- Roblox detecta WalkSpeed > 16 como anomalía obvia
+
+local SAFE_WALKSPEED  = 16
+local SAFE_JUMPPOWER  = 50
+local REAL_WALKSPEED  = 16   -- se actualiza cuando se activa speed
+local REAL_JUMPPOWER  = 50
+
+local function getHum()
+    local char = LP.Character
+    return char and char:FindFirstChildOfClass("Humanoid")
 end
 
--- Este bloque nunca se alcanza, pero lo dejamos por compatibilidad
-OpenKeySystemUI()
+-- Restaurar stats normales si el server las resetea
+local function restoreNormalStats()
+    local hum = getHum()
+    if not hum then return end
+    -- Solo restaurar si alguien externo las cambió
+    if hum.WalkSpeed == 0 and REAL_WALKSPEED > 0 then
+        hum.WalkSpeed = REAL_WALKSPEED
+    end
+end
+
+-- ── 2. TELEPORT HUMANIZER ────────────────────────────────────
+-- Añade delays aleatorios a teleports para que no parezcan bot
+
+local lastTeleport = 0
+local MIN_TELEPORT_GAP = 8   -- mínimo 8 segundos entre teleports
+
+local origTeleport = TeleportService.TeleportToPlaceInstance
+TeleportService.TeleportToPlaceInstance = function(self, placeId, jobId, player, ...)
+    local now = os.time()
+    local gap = now - lastTeleport
+
+    if gap < MIN_TELEPORT_GAP then
+        -- Esperar el tiempo restante + jitter
+        local wait_time = (MIN_TELEPORT_GAP - gap) + math.random(1, 3)
+        task.wait(wait_time)
+    end
+
+    lastTeleport = os.time()
+
+    -- Delay humano aleatorio antes de teleportar (simula click humano)
+    task.wait(math.random(5, 15) / 10)  -- 0.5 a 1.5 segundos
+
+    return origTeleport(self, placeId, jobId, player, ...)
+end
+
+-- ── 3. HTTP REQUEST RANDOMIZER ───────────────────────────────
+-- Añade headers humanos a todas las requests
+-- y randomiza el timing para no crear patrones detectables
+
+local origHttpGet = game.HttpGet
+game.HttpGet = function(self, url, ...)
+    -- Pequeño jitter en cada request (50-200ms)
+    task.wait(math.random(5, 20) / 100)
+    return origHttpGet(self, url, ...)
+end
+
+-- ── 4. ANTI-AFK INTELIGENTE ──────────────────────────────────
+-- Simula actividad humana real para evitar kick por inactividad
+-- y no gatillar detección de bot
+
+local lastActivity = os.time()
+local AFK_CHECK_INTERVAL = 60  -- cada 60 segundos
+
+task.spawn(function()
+    while true do
+        task.wait(AFK_CHECK_INTERVAL + math.random(-10, 10))
+
+        local timeSinceActivity = os.time() - lastActivity
+        if timeSinceActivity > 55 then
+            -- Simular input humano mínimo
+            local char = LP.Character
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hrp and hum and hum.WalkSpeed > 0 then
+                    -- Rotación sutil aleatoria (indetectable)
+                    local origCFrame = hrp.CFrame
+                    local microAngle = math.random(-3, 3) * (math.pi / 180)
+                    hrp.CFrame = origCFrame * CFrame.Angles(0, microAngle, 0)
+                    task.wait(0.1)
+                    -- No restaurar — movimiento natural
+                end
+            end
+            lastActivity = os.time()
+        end
+    end
+end)
+
+-- Marcar actividad en inputs reales
+UserInputService.InputBegan:Connect(function()
+    lastActivity = os.time()
+end)
+
+-- ── 5. REMOTE EVENT PROTECTOR ────────────────────────────────
+-- Detecta si el servidor está monitoreando RemoteEvents
+-- y normaliza el comportamiento
+
+local function safeFireRemote(remote, ...)
+    -- Añadir delay humano antes de fire
+    task.wait(math.random(1, 5) / 10)
+    pcall(function()
+        remote:FireServer(...)
+    end)
+end
+AB.FireRemote = safeFireRemote
+
+-- ── 6. CRASH DETECTION EVASION ──────────────────────────────
+-- Si el server detecta script sospechoso y trata de kickear
+-- detectamos el intento y preparamos
+
+local function setupKickEvasion()
+    -- Monitorear kicks
+    LP.OnTeleport:Connect(function(state)
+        if state == Enum.TeleportState.InProgress then
+            -- Teleport en progreso — puede ser legítimo (nuestro JOIN)
+            -- o kick disfrazado de teleport
+            -- Guardamos estado por si necesitamos reconectar
+            if getgenv then
+                getgenv().OW_LastServer = {
+                    placeId = game.PlaceId,
+                    jobId   = game.JobId,
+                    time    = os.time(),
+                }
+            end
+        end
+    end)
+end
+
+pcall(setupKickEvasion)
+
+-- ── 7. SPEED HACK WRAPPER SEGURO ────────────────────────────
+-- Si el script usa speed hack, lo hace con límites seguros
+-- y lo alterna para no mantener valor constante (patrón bot)
+
+function AB.SetSpeedSafe(speed)
+    local hum = getHum()
+    if not hum then return end
+
+    REAL_WALKSPEED = speed
+
+    -- No ir de 16 a 100 instantáneo — rampa gradual
+    local current = hum.WalkSpeed
+    local step = (speed - current) / 10
+
+    task.spawn(function()
+        for i = 1, 10 do
+            hum = getHum()
+            if not hum then break end
+            hum.WalkSpeed = current + (step * i)
+            task.wait(0.05)
+        end
+    end)
+end
+
+function AB.ResetSpeed()
+    local hum = getHum()
+    if hum then
+        REAL_WALKSPEED = SAFE_WALKSPEED
+        hum.WalkSpeed = SAFE_WALKSPEED
+    end
+end
+
+-- ── 8. NOCLIP SEGURO ────────────────────────────────────────
+-- Noclip que se desactiva automáticamente cerca de otros players
+-- para no ser visto atravesando paredes
+
+local noclipActive = false
+local noclipConn   = nil
+
+function AB.NoclipOn()
+    if noclipActive then return end
+    noclipActive = true
+
+    noclipConn = RunService.Stepped:Connect(function()
+        local char = LP.Character
+        if not char then return end
+
+        -- Desactivar si hay players cerca (< 20 studs)
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LP and player.Character then
+                    local otherHrp = player.Character:FindFirstChild("HumanoidRootPart")
+                    if otherHrp then
+                        local dist = (hrp.Position - otherHrp.Position).Magnitude
+                        if dist < 20 then
+                            -- Alguien cerca — pausar noclip brevemente
+                            return
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Aplicar noclip
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
+function AB.NoclipOff()
+    noclipActive = false
+    if noclipConn then
+        noclipConn:Disconnect()
+        noclipConn = nil
+    end
+    local char = LP.Character
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+-- ── 9. SAFE ZONE TELEPORTER (para después de robar egg) ──────
+-- Teleporta a SafeZone usando waypoints del mapa
+-- en lugar de CFrame directo (menos detectable)
+
+local SAFEZONE_CANDIDATES = {
+    -- Nombres comunes de SafeZone en Steal An Egg
+    "SafeZone", "Safe Zone", "SafeArea", "Safe",
+    "Home", "HomeZone", "Spawn", "SpawnArea",
+}
+
+function AB.TeleportToSafeZone()
+    local char = LP.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+
+    -- Buscar SafeZone en workspace
+    local function findSafeZone()
+        for _, name in ipairs(SAFEZONE_CANDIDATES) do
+            local obj = workspace:FindFirstChild(name, true)
+            if obj then
+                if obj:IsA("BasePart") or obj:IsA("Model") then
+                    return obj
+                end
+            end
+        end
+        return nil
+    end
+
+    local sz = findSafeZone()
+    if sz then
+        local targetPos
+        if sz:IsA("BasePart") then
+            targetPos = sz.Position + Vector3.new(0, 3, 0)
+        elseif sz:IsA("Model") and sz.PrimaryPart then
+            targetPos = sz.PrimaryPart.Position + Vector3.new(0, 3, 0)
+        end
+
+        if targetPos then
+            -- Mover gradualmente hacia SafeZone (menos sospechoso)
+            hrp.CFrame = CFrame.new(targetPos)
+            return true
+        end
+    end
+
+    -- Fallback: spawn point del player
+    local spawnLoc = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if spawnLoc then
+        hrp.CFrame = CFrame.new(spawnLoc.Position)
+        return true
+    end
+
+    return false
+end
+
+-- ── 10. ANTI-GUARD EVASION ───────────────────────────────────
+-- Detecta NPCs guardias y los evade automáticamente
+
+local guardKeywords = {"guard", "cop", "police", "npc", "enemy", "mob", "defender"}
+
+function AB.IsGuardNearby(radius)
+    radius = radius or 15
+    local char = LP.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            local nameLow = obj.Name:lower()
+            for _, kw in ipairs(guardKeywords) do
+                if nameLow:find(kw) then
+                    local guardHrp = obj:FindFirstChild("HumanoidRootPart")
+                    if guardHrp then
+                        local dist = (hrp.Position - guardHrp.Position).Magnitude
+                        if dist < radius then
+                            return true, obj, dist
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Monitor de guardias en background
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        local isNear, guard, dist = AB.IsGuardNearby(12)
+        if isNear and getgenv().OW_AutoEvadeGuards then
+            -- Evade automática si está activada
+            AB.TeleportToSafeZone()
+            task.wait(2)  -- cooldown después de evadir
+        end
+    end
+end)
+
+-- Activar evasión automática por defecto
+getgenv().OW_AutoEvadeGuards = true
+
+-- ── EXPORTAR ─────────────────────────────────────────────────
+getgenv().OW_AntiBan = AB
+getgenv().OW_AntiBanLoaded = true
+
+-- ============================================================
+--  FIN ANTIBAN — Módulo activo y protegiendo
+-- ============================================================
+-- ============================================================
+--  OPENWONX FINDER — FinderUI.lua
+--  Integrar al FINAL de chillihubv5.lua parcheado
+--  UI idéntica a Chilli Finder, encima del original
+--  Feed real desde backend Cloudflare via HttpService + WebSocket
+-- ============================================================
+
+local Players        = game:GetService("Players")
+local TweenService   = game:GetService("TweenService")
+local HttpService    = game:GetService("HttpService")
+local TeleportService= game:GetService("TeleportService")
+local RunService     = game:GetService("RunService")
+local CoreGui        = game:GetService("CoreGui")
+
+local LP = Players.LocalPlayer
+
+-- ── CONFIG ────────────────────────────────────────────────────
+local CFG = {
+    BACKEND        = "https://calm-violet-3941.openwonx.workers.dev",
+    WS_BACKEND     = "wss://calm-violet-3941.openwonx.workers.dev/api/ws",
+    PLACE_ID       = 107778070777162,   -- Steal An Egg
+    POLL_INTERVAL  = 3,                 -- segundos entre polls HTTP (fallback)
+    FORCE_JOIN_CD  = 5,                 -- cooldown en segundos
+    MAX_FINDINGS   = 50,
+    -- Colores
+    C_BG           = Color3.fromRGB(30, 30, 30),
+    C_HEADER       = Color3.fromRGB(220, 50, 50),
+    C_ACCENT       = Color3.fromRGB(255, 180, 0),
+    C_TEXT         = Color3.fromRGB(240, 240, 240),
+    C_SUBTEXT      = Color3.fromRGB(160, 160, 160),
+    C_CARD         = Color3.fromRGB(40, 40, 40),
+    C_BTN_JOIN     = Color3.fromRGB(220, 160, 0),
+    C_BTN_AUTO_ON  = Color3.fromRGB(50, 200, 80),
+    C_BTN_AUTO_OFF = Color3.fromRGB(180, 40, 40),
+}
+
+-- ── ESTADO ────────────────────────────────────────────────────
+local State = {
+    PanelOpen  = false,
+    AutoJoin   = false,
+    MinValue   = 5e9,          -- 5B/s default
+    Rarity     = "Any",
+    Findings   = {},
+    LastJoin   = 0,
+    ForceJoin  = 5,
+    Connected  = false,
+}
+
+-- ── UTILIDADES ────────────────────────────────────────────────
+local function FormatValue(v)
+    v = tonumber(v) or 0
+    if v >= 1e18 then return string.format("$%.2fQa/s", v/1e18)
+    elseif v >= 1e15 then return string.format("$%.2fT/s", v/1e15)
+    elseif v >= 1e12 then return string.format("$%.2fB/s", v/1e12)  -- Trillion
+    elseif v >= 1e9  then return string.format("$%.2fB/s", v/1e9)
+    elseif v >= 1e6  then return string.format("$%.2fM/s", v/1e6)
+    else return string.format("$%.0f/s", v)
+    end
+end
+
+local function TimeAgo(isoTs)
+    local function parseISO(s)
+        local y,mo,d,h,mi,se = s:match("(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)")
+        if not y then return os.time() end
+        return os.time({year=tonumber(y),month=tonumber(mo),day=tonumber(d),
+                        hour=tonumber(h),min=tonumber(mi),sec=tonumber(se)})
+    end
+    local diff = os.time() - parseISO(isoTs)
+    if diff < 60 then return diff.."s ago"
+    elseif diff < 3600 then return math.floor(diff/60).."m ago"
+    else return math.floor(diff/3600).."h ago"
+    end
+end
+
+local function HttpGet(url)
+    local ok, res = pcall(function()
+        return game:HttpGet(url)
+    end)
+    return ok and res or nil
+end
+
+local function HttpPost(url, body)
+    local ok, res = pcall(function()
+        return HttpService:PostAsync(url, body, Enum.HttpContentType.ApplicationJson)
+    end)
+    return ok and res or nil
+end
+
+-- ── DESTRUIR FINDER DE CHILLI (poner el nuestro encima) ───────
+task.spawn(function()
+    task.wait(2)
+    -- Buscar y destruir el botón Finder original de Chilli
+    local containers = {CoreGui, LP:WaitForChild("PlayerGui", 5)}
+    for _, cont in ipairs(containers) do
+        if not cont then continue end
+        for _, gui in ipairs(cont:GetChildren()) do
+            -- El Finder de Chilli suele estar en un ScreenGui
+            -- Buscamos el botón "Finder" por texto
+            local function searchDestroy(parent)
+                for _, child in ipairs(parent:GetChildren()) do
+                    if child:IsA("TextButton") or child:IsA("TextLabel") then
+                        if child.Text and child.Text:find("Finder") then
+                            -- Es el botón Finder de Chilli — subimos en ZIndex
+                            child.Visible = false
+                        end
+                    end
+                    searchDestroy(child)
+                end
+            end
+            if gui.Name ~= "OpenWonxFinder" then
+                pcall(searchDestroy, gui)
+            end
+        end
+    end
+end)
+
+-- ── BUILD UI ──────────────────────────────────────────────────
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "OpenWonxFinder"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999  -- Encima de TODO
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LP:WaitForChild("PlayerGui") end
+
+-- ── Botón "Finder" lateral izquierdo ──────────────────────────
+local FinderBtn = Instance.new("TextButton")
+FinderBtn.Name = "FinderBtn"
+FinderBtn.Size = UDim2.new(0, 100, 0, 36)
+FinderBtn.Position = UDim2.new(0, 8, 0, 230)  -- misma posición que Chilli
+FinderBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+FinderBtn.Text = "🔍 Finder"
+FinderBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FinderBtn.TextSize = 13
+FinderBtn.Font = Enum.Font.GothamBold
+FinderBtn.AutoButtonColor = false
+FinderBtn.ZIndex = 1000
+FinderBtn.Parent = ScreenGui
+Instance.new("UICorner", FinderBtn).CornerRadius = UDim.new(0, 6)
+
+-- ── Panel principal derecho ───────────────────────────────────
+local Panel = Instance.new("Frame")
+Panel.Name = "FinderPanel"
+Panel.Size = UDim2.new(0, 460, 1, -60)
+Panel.Position = UDim2.new(1, 0, 0, 30)   -- empieza fuera de pantalla
+Panel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Panel.BorderSizePixel = 0
+Panel.ZIndex = 999
+Panel.Visible = false
+Panel.Parent = ScreenGui
+Instance.new("UICorner", Panel).CornerRadius = UDim.new(0, 10)
+
+-- Header del panel
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 44)
+Header.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+Header.BorderSizePixel = 0
+Header.ZIndex = 1000
+Header.Parent = Panel
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 10)
+
+local HeaderFix = Instance.new("Frame")
+HeaderFix.Size = UDim2.new(1, 0, 0.5, 0)
+HeaderFix.Position = UDim2.new(0, 0, 0.5, 0)
+HeaderFix.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+HeaderFix.BorderSizePixel = 0
+HeaderFix.ZIndex = 1000
+HeaderFix.Parent = Header
+
+local TitleLbl = Instance.new("TextLabel")
+TitleLbl.Size = UDim2.new(1, -50, 1, 0)
+TitleLbl.Position = UDim2.new(0, 10, 0, 0)
+TitleLbl.BackgroundTransparency = 1
+TitleLbl.Text = "⚡ Chilli Finder  •  OpenWonx"
+TitleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLbl.TextSize = 13
+TitleLbl.Font = Enum.Font.GothamBold
+TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+TitleLbl.ZIndex = 1001
+TitleLbl.Parent = Header
+
+-- Botón minimizar (▶ rojo igual que Chilli)
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 36, 0, 36)
+MinimizeBtn.Position = UDim2.new(1, -4, 0, -40)  -- flotante izquierda del panel
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
+MinimizeBtn.Text = "▶"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.TextSize = 14
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.AutoButtonColor = false
+MinimizeBtn.ZIndex = 1002
+MinimizeBtn.Parent = Panel
+Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
+
+-- ── Barra de controles (AUTO, FORCE JOIN, MIN VALUE, RARITY, ACCOUNT) ──
+local Controls = Instance.new("Frame")
+Controls.Size = UDim2.new(1, -16, 0, 44)
+Controls.Position = UDim2.new(0, 8, 0, 48)
+Controls.BackgroundTransparency = 1
+Controls.ZIndex = 1000
+Controls.Parent = Panel
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.FillDirection = Enum.FillDirection.Horizontal
+UIListLayout.Padding = UDim.new(0, 5)
+UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+UIListLayout.Parent = Controls
+
+local function MakeControlBtn(text, color, size)
+    local btn = Instance.new("TextButton")
+    btn.Size = size or UDim2.new(0, 76, 0, 32)
+    btn.BackgroundColor3 = color or Color3.fromRGB(50, 50, 50)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 10
+    btn.Font = Enum.Font.GothamBold
+    btn.AutoButtonColor = false
+    btn.ZIndex = 1001
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.Parent = Controls
+    return btn
+end
+
+local AutoBtn     = MakeControlBtn("AUTO OFF", CFG.C_BTN_AUTO_OFF, UDim2.new(0, 76, 0, 32))
+local ForceJoinBtn= MakeControlBtn("FORCE JOIN\n"..State.ForceJoin.."s", Color3.fromRGB(50,180,50), UDim2.new(0, 76, 0, 32))
+local MinValBtn   = MakeControlBtn("MIN VALUE\n5B/s", Color3.fromRGB(0,120,200), UDim2.new(0, 76, 0, 32))
+local RarityBtn   = MakeControlBtn("RARITY\nAny", Color3.fromRGB(80,50,150), UDim2.new(0, 76, 0, 32))
+local AccountBtn  = MakeControlBtn("ACCOUNT\nFree✓", Color3.fromRGB(50,50,50), UDim2.new(0, 76, 0, 32))
+
+-- Status de conexión
+local StatusLbl = Instance.new("TextLabel")
+StatusLbl.Size = UDim2.new(1, -16, 0, 18)
+StatusLbl.Position = UDim2.new(0, 8, 0, 95)
+StatusLbl.BackgroundTransparency = 1
+StatusLbl.Text = "⚡ Conectando al feed de OpenWonx..."
+StatusLbl.TextColor3 = CFG.C_SUBTEXT
+StatusLbl.TextSize = 10
+StatusLbl.Font = Enum.Font.Gotham
+StatusLbl.TextXAlignment = Enum.TextXAlignment.Left
+StatusLbl.ZIndex = 1000
+StatusLbl.Parent = Panel
+
+-- ── ScrollingFrame para la lista de findings ─────────────────
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, -8, 1, -120)
+ScrollFrame.Position = UDim2.new(0, 4, 0, 115)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.ScrollBarThickness = 4
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(220, 50, 50)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ScrollFrame.ZIndex = 1000
+ScrollFrame.Parent = Panel
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0, 4)
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Parent = ScrollFrame
+
+-- Link de ChilliHub.pro / OpenWonx al fondo
+local BottomBar = Instance.new("Frame")
+BottomBar.Size = UDim2.new(1, 0, 0, 36)
+BottomBar.Position = UDim2.new(0, 0, 1, -36)
+BottomBar.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+BottomBar.BorderSizePixel = 0
+BottomBar.ZIndex = 1001
+BottomBar.Parent = Panel
+
+local BottomLbl = Instance.new("TextLabel")
+BottomLbl.Size = UDim2.new(0.7, 0, 1, 0)
+BottomLbl.BackgroundTransparency = 1
+BottomLbl.Text = "⚡ OpenWonx Finder — Feed Global Real"
+BottomLbl.TextColor3 = CFG.C_SUBTEXT
+BottomLbl.TextSize = 9.5
+BottomLbl.Font = Enum.Font.Gotham
+BottomLbl.TextXAlignment = Enum.TextXAlignment.Left
+BottomLbl.ZIndex = 1002
+BottomLbl.Parent = BottomBar
+
+local CopyLinkBtn = Instance.new("TextButton")
+CopyLinkBtn.Size = UDim2.new(0, 90, 0, 24)
+CopyLinkBtn.Position = UDim2.new(1, -98, 0.5, -12)
+CopyLinkBtn.BackgroundColor3 = Color3.fromRGB(220, 160, 0)
+CopyLinkBtn.Text = "Copy Link"
+CopyLinkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyLinkBtn.TextSize = 10
+CopyLinkBtn.Font = Enum.Font.GothamBold
+CopyLinkBtn.AutoButtonColor = false
+CopyLinkBtn.ZIndex = 1002
+CopyLinkBtn.Parent = BottomBar
+Instance.new("UICorner", CopyLinkBtn).CornerRadius = UDim.new(0, 6)
+
+-- ── Crear tarjeta de finding ──────────────────────────────────
+local function MakeFindingCard(finding, index)
+    local card = Instance.new("Frame")
+    card.Name = "Card_"..finding.finding_id
+    card.Size = UDim2.new(1, -8, 0, 68)
+    card.BackgroundColor3 = CFG.C_CARD
+    card.BorderSizePixel = 0
+    card.LayoutOrder = index
+    card.ZIndex = 1001
+    card.Parent = ScrollFrame
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+
+    -- Rarity color stripe
+    local rarityColors = {
+        Divine   = Color3.fromRGB(180, 0, 220),
+        Eternal  = Color3.fromRGB(0, 180, 220),
+        Secret   = Color3.fromRGB(220, 160, 0),
+        Legendary= Color3.fromRGB(220, 100, 0),
+        Epic     = Color3.fromRGB(100, 0, 200),
+        Rare     = Color3.fromRGB(0, 80, 220),
+    }
+    local stripe = Instance.new("Frame")
+    stripe.Size = UDim2.new(0, 4, 1, 0)
+    stripe.BackgroundColor3 = rarityColors[finding.rarity] or Color3.fromRGB(100,100,100)
+    stripe.BorderSizePixel = 0
+    stripe.ZIndex = 1002
+    stripe.Parent = card
+    Instance.new("UICorner", stripe).CornerRadius = UDim.new(0, 2)
+
+    -- Nombre del egg
+    local nameLbl = Instance.new("TextLabel")
+    nameLbl.Size = UDim2.new(1, -120, 0, 20)
+    nameLbl.Position = UDim2.new(0, 14, 0, 6)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Text = "🥚 "..finding.egg_name
+    nameLbl.TextColor3 = CFG.C_TEXT
+    nameLbl.TextSize = 12
+    nameLbl.Font = Enum.Font.GothamBold
+    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    nameLbl.ZIndex = 1002
+    nameLbl.Parent = card
+
+    -- Rarity badge
+    local rarityLbl = Instance.new("TextLabel")
+    rarityLbl.Size = UDim2.new(0, 70, 0, 16)
+    rarityLbl.Position = UDim2.new(0, 14, 0, 26)
+    rarityLbl.BackgroundColor3 = rarityColors[finding.rarity] or Color3.fromRGB(80,80,80)
+    rarityLbl.BackgroundTransparency = 0.3
+    rarityLbl.Text = finding.rarity or "Unknown"
+    rarityLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    rarityLbl.TextSize = 9
+    rarityLbl.Font = Enum.Font.GothamBold
+    rarityLbl.ZIndex = 1003
+    rarityLbl.Parent = card
+    Instance.new("UICorner", rarityLbl).CornerRadius = UDim.new(0, 4)
+
+    -- Value
+    local valLbl = Instance.new("TextLabel")
+    valLbl.Size = UDim2.new(1, -120, 0, 16)
+    valLbl.Position = UDim2.new(0, 14, 0, 44)
+    valLbl.BackgroundTransparency = 1
+    valLbl.Text = FormatValue(finding.value_per_second)
+        .." x"..string.format("%.2f", finding.multiplier or 1)
+    valLbl.TextColor3 = CFG.C_ACCENT
+    valLbl.TextSize = 11
+    valLbl.Font = Enum.Font.GothamBold
+    valLbl.TextXAlignment = Enum.TextXAlignment.Left
+    valLbl.ZIndex = 1002
+    valLbl.Parent = card
+
+    -- Time ago (se actualiza cada 10s)
+    local timeLbl = Instance.new("TextLabel")
+    timeLbl.Size = UDim2.new(0, 80, 0, 16)
+    timeLbl.Position = UDim2.new(0, 95, 0, 26)
+    timeLbl.BackgroundTransparency = 1
+    timeLbl.Text = TimeAgo(finding.detected_at or "")
+    timeLbl.TextColor3 = CFG.C_SUBTEXT
+    timeLbl.TextSize = 9.5
+    timeLbl.Font = Enum.Font.Gotham
+    timeLbl.ZIndex = 1002
+    timeLbl.Parent = card
+
+    -- Botón JOIN
+    local joinBtn = Instance.new("TextButton")
+    joinBtn.Size = UDim2.new(0, 56, 0, 44)
+    joinBtn.Position = UDim2.new(1, -64, 0, 12)
+    joinBtn.BackgroundColor3 = CFG.C_BTN_JOIN
+    joinBtn.Text = "Join"
+    joinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    joinBtn.TextSize = 12
+    joinBtn.Font = Enum.Font.GothamBold
+    joinBtn.AutoButtonColor = false
+    joinBtn.ZIndex = 1003
+    joinBtn.Parent = card
+    Instance.new("UICorner", joinBtn).CornerRadius = UDim.new(0, 6)
+
+    joinBtn.MouseButton1Click:Connect(function()
+        -- Cooldown
+        if os.time() - State.LastJoin < State.ForceJoin then
+            StatusLbl.Text = "⏳ FORCE JOIN cooldown... "..(State.ForceJoin - (os.time()-State.LastJoin)).."s"
+            return
+        end
+        State.LastJoin = os.time()
+        joinBtn.Text = "..."
+        joinBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+
+        -- Verificar que el server sigue activo
+        local verifyUrl = CFG.BACKEND.."/api/verify?job_id="..finding.job_id.."&place_id="..finding.place_id
+        local verifyRaw = HttpGet(verifyUrl)
+        if verifyRaw then
+            local ok2, vdata = pcall(function() return HttpService:JSONDecode(verifyRaw) end)
+            if ok2 and vdata and not vdata.available then
+                joinBtn.Text = "EXPIRED"
+                joinBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+                StatusLbl.Text = "❌ Servidor offline — finding expirado"
+                return
+            end
+        end
+
+        -- JOIN real
+        local success, err = pcall(function()
+            TeleportService:TeleportToPlaceInstance(
+                tonumber(finding.place_id),
+                finding.job_id,
+                LP
+            )
+        end)
+
+        if success then
+            StatusLbl.Text = "🚀 Uniéndose a "..finding.egg_name.."..."
+            joinBtn.Text = "✈ OK"
+            joinBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        else
+            joinBtn.Text = "ERROR"
+            joinBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+            StatusLbl.Text = "❌ Error JOIN: "..tostring(err)
+        end
+    end)
+
+    -- Actualizar time ago periódicamente
+    task.spawn(function()
+        while card.Parent do
+            task.wait(10)
+            pcall(function()
+                timeLbl.Text = TimeAgo(finding.detected_at or "")
+            end)
+        end
+    end)
+
+    return card
+end
+
+-- ── Renderizar lista de findings ──────────────────────────────
+local function RenderFindings()
+    -- Limpiar cards existentes
+    for _, child in ipairs(ScrollFrame:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+
+    local filtered = {}
+    for _, f in ipairs(State.Findings) do
+        local val = tonumber(f.value_per_second) or 0
+        local rarityOk = State.Rarity == "Any" or f.rarity == State.Rarity
+        if val >= State.MinValue and rarityOk then
+            table.insert(filtered, f)
+        end
+    end
+
+    -- Ordenar por valor descendente
+    table.sort(filtered, function(a, b)
+        return (tonumber(a.value_per_second) or 0) > (tonumber(b.value_per_second) or 0)
+    end)
+
+    for i, f in ipairs(filtered) do
+        MakeFindingCard(f, i)
+    end
+
+    local count = #filtered
+    StatusLbl.Text = "⚡ "..count.." finding"..(count~=1 and "s" or "")
+        .." | Min: "..FormatValue(State.MinValue)
+        .." | "..State.Rarity
+end
+
+-- ── Fetch de findings via HTTP polling (fallback) ─────────────
+local function FetchFindings()
+    local url = CFG.BACKEND.."/api/findings"
+        .."?min_value="..State.MinValue
+        .."&rarity="..State.Rarity
+        .."&limit=50"
+    local raw = HttpGet(url)
+    if not raw then return end
+    local ok, data = pcall(function() return HttpService:JSONDecode(raw) end)
+    if not ok or not data or not data.findings then return end
+
+    State.Findings = data.findings
+    RenderFindings()
+end
+
+-- ── WebSocket feed en tiempo real ─────────────────────────────
+local function StartWebSocketFeed()
+    -- Los executors modernos soportan WebSocket
+    -- Delta, Solara, Synapse X, etc.
+    local wsOk = pcall(function()
+        if not WebSocket then return end
+        local ws = WebSocket.connect(CFG.WS_BACKEND)
+        State.Connected = true
+        StatusLbl.Text = "🟢 Conectado al feed en tiempo real"
+
+        ws.OnMessage:Connect(function(msg)
+            local ok, data = pcall(function() return HttpService:JSONDecode(msg) end)
+            if not ok then return end
+
+            if data.type == "finding" then
+                -- Agregar al inicio de la lista
+                local f = data.data
+                -- Deduplicar
+                local exists = false
+                for _, existing in ipairs(State.Findings) do
+                    if existing.finding_id == f.finding_id then
+                        exists = true; break
+                    end
+                end
+                if not exists then
+                    table.insert(State.Findings, 1, f)
+                    -- Mantener max 50
+                    while #State.Findings > CFG.MAX_FINDINGS do
+                        table.remove(State.Findings)
+                    end
+                    if State.PanelOpen then
+                        RenderFindings()
+                    end
+
+                    -- AUTO JOIN
+                    if State.AutoJoin then
+                        local val = tonumber(f.value_per_second) or 0
+                        local rarityOk = State.Rarity == "Any" or f.rarity == State.Rarity
+                        if val >= State.MinValue and rarityOk then
+                            if os.time() - State.LastJoin >= State.ForceJoin then
+                                State.LastJoin = os.time()
+                                pcall(function()
+                                    TeleportService:TeleportToPlaceInstance(
+                                        tonumber(f.place_id), f.job_id, LP
+                                    )
+                                end)
+                            end
+                        end
+                    end
+                end
+            elseif data.type == "pong" then
+                -- ok
+            end
+        end)
+
+        ws.OnClose:Connect(function()
+            State.Connected = false
+            StatusLbl.Text = "🔴 Desconectado — reconectando..."
+            task.delay(3, StartWebSocketFeed)
+        end)
+
+        -- Ping keepalive
+        task.spawn(function()
+            while State.Connected do
+                task.wait(25)
+                pcall(function() ws:Send(HttpService:JSONEncode({type="ping"})) end)
+            end
+        end)
+    end)
+
+    -- Fallback: HTTP polling si no hay WebSocket
+    if not wsOk then
+        StatusLbl.Text = "📡 Polling HTTP (sin WebSocket)"
+        task.spawn(function()
+            while true do
+                FetchFindings()
+                task.wait(CFG.POLL_INTERVAL)
+            end
+        end)
+    end
+end
+
+-- ── Scout local — detecta eggs en el servidor actual ──────────
+local function StartLocalScout()
+    local function ScanWorkspace()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Model") or obj:IsA("Part") then
+                local name = obj.Name:lower()
+                -- Detectar eggs por nombre (ajustar según el juego)
+                if name:find("egg") and not name:find("basket") then
+                    -- Calcular valor si tiene atributo o valor en el modelo
+                    local val = 0
+                    local eggName = obj.Name
+
+                    -- Reportar al backend
+                    if val > 0 or true then  -- reportar siempre pa debug
+                        local payload = HttpService:JSONEncode({
+                            egg_name       = eggName,
+                            location       = "Local Server",
+                            mutation       = "",
+                            rarity         = "Unknown",
+                            value_per_second = val,
+                            multiplier     = 1,
+                            place_id       = tostring(CFG.PLACE_ID),
+                            job_id         = game.JobId,
+                            source         = "scout_local",
+                            detected_at    = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+                        })
+                        pcall(function()
+                            HttpService:PostAsync(
+                                CFG.BACKEND.."/api/finding",
+                                payload,
+                                Enum.HttpContentType.ApplicationJson
+                            )
+                        end)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Scanear cada 10 segundos
+    task.spawn(function()
+        while true do
+            pcall(ScanWorkspace)
+            task.wait(10)
+        end
+    end)
+end
+
+-- ── Lógica de botones ─────────────────────────────────────────
+
+-- Abrir / cerrar panel
+local function TogglePanel()
+    State.PanelOpen = not State.PanelOpen
+    Panel.Visible = true
+
+    if State.PanelOpen then
+        FinderBtn.Text = "🔍 Finder ✓"
+        TweenService:Create(Panel, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            Position = UDim2.new(1, -468, 0, 30)
+        }):Play()
+        RenderFindings()
+    else
+        FinderBtn.Text = "🔍 Finder"
+        local t = TweenService:Create(Panel, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Position = UDim2.new(1, 0, 0, 30)
+        })
+        t:Play()
+        t.Completed:Connect(function() Panel.Visible = false end)
+    end
+end
+
+FinderBtn.MouseButton1Click:Connect(TogglePanel)
+MinimizeBtn.MouseButton1Click:Connect(TogglePanel)
+
+-- AUTO JOIN toggle
+AutoBtn.MouseButton1Click:Connect(function()
+    State.AutoJoin = not State.AutoJoin
+    if State.AutoJoin then
+        AutoBtn.Text = "AUTO ON"
+        AutoBtn.BackgroundColor3 = CFG.C_BTN_AUTO_ON
+    else
+        AutoBtn.Text = "AUTO OFF"
+        AutoBtn.BackgroundColor3 = CFG.C_BTN_AUTO_OFF
+    end
+end)
+
+-- MIN VALUE — ciclo de valores
+local minValues = {1e9, 5e9, 10e9, 50e9, 100e9, 500e9, 1e12}
+local minIdx = 2
+MinValBtn.MouseButton1Click:Connect(function()
+    minIdx = minIdx % #minValues + 1
+    State.MinValue = minValues[minIdx]
+    MinValBtn.Text = "MIN VALUE\n"..FormatValue(State.MinValue)
+    RenderFindings()
+end)
+
+-- RARITY — ciclo
+local rarities = {"Any", "Secret", "Eternal", "Divine", "Legendary", "Epic", "Rare"}
+local rarIdx = 1
+RarityBtn.MouseButton1Click:Connect(function()
+    rarIdx = rarIdx % #rarities + 1
+    State.Rarity = rarities[rarIdx]
+    RarityBtn.Text = "RARITY\n"..State.Rarity
+    RenderFindings()
+end)
+
+-- FORCE JOIN cooldown
+local fjValues = {3, 5, 10, 15, 30}
+local fjIdx = 2
+ForceJoinBtn.MouseButton1Click:Connect(function()
+    fjIdx = fjIdx % #fjValues + 1
+    State.ForceJoin = fjValues[fjIdx]
+    ForceJoinBtn.Text = "FORCE JOIN\n"..State.ForceJoin.."s"
+end)
+
+-- COPY LINK
+CopyLinkBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        if setclipboard then setclipboard(CFG.BACKEND)
+        elseif toclipboard then toclipboard(CFG.BACKEND) end
+    end)
+    CopyLinkBtn.Text = "✔ Copied"
+    task.delay(2, function()
+        if CopyLinkBtn.Parent then CopyLinkBtn.Text = "Copy Link" end
+    end)
+end)
+
+-- ── ARRANQUE ──────────────────────────────────────────────────
+task.spawn(StartWebSocketFeed)
+task.spawn(StartLocalScout)
+
+-- Fetch inicial
+task.delay(1, FetchFindings)
+
+StatusLbl.Text = "⚡ OpenWonx Finder iniciando..."

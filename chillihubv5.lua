@@ -345,6 +345,7 @@ getgenv().OW_AntiBanLoaded = true
 -- ============================================================
 
 
+
 -- ============================================================
 --  OPENWONX SILENT HOOK — Interceptor de conexiones Chilli
 --  Generado automáticamente por OpenWonx PC Controller
@@ -504,6 +505,7 @@ end)
 -- ============================================================
 --  FIN DEL HOOK — Todo lo que Chilli ve, OpenWonx también ve
 -- ============================================================
+
 
 
 -- =========================================================================
